@@ -15,6 +15,6 @@
   ],
   "env": {
     "NODE_ENV": "production",
-    "API_KEY": "@my-api-key"
+    "API_KEY": "mysecretkey"
   }
 }
