@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -8,12 +9,12 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: process.env.CORS_ORIGIN || "*", // allow all if not set
     credentials: true,
   }),
 );
 
-// MongoDB Connection (Only connect once)
+// MongoDB Connection (singleton)
 let isConnected = false;
 
 const connectDB = async () => {
@@ -26,35 +27,36 @@ const connectDB = async () => {
     });
 
     isConnected = db.connections[0].readyState;
-    console.log("MongoDB Connected");
+    console.log("✅ MongoDB Connected");
   } catch (error) {
-    console.error("MongoDB Connection Error:", error);
+    console.error("❌ MongoDB Connection Error:", error.message);
+    throw error;
   }
 };
 
-// Schema
+// Reservation Schema
 const reservationSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     email: { type: String, required: true },
-    phone: { type: Number, required: true },
+    phone: { type: String, required: true }, // changed to String
     date: { type: String, required: true },
     time: { type: String, required: true },
   },
   { collection: "rest" },
 );
 
-// Model
+// Reservation Model
 const Reservation =
   mongoose.models.Reservation ||
   mongoose.model("Reservation", reservationSchema);
 
-// POST API
+// POST API - Create Reservation
 app.post("/api/reservation", async (req, res) => {
-  await connectDB();
-
   try {
+    await connectDB();
+
     const newReservation = new Reservation(req.body);
     await newReservation.save();
 
@@ -63,24 +65,26 @@ app.post("/api/reservation", async (req, res) => {
       message: "Reservation saved successfully!",
     });
   } catch (error) {
+    console.error("Reservation POST Error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Error saving data",
+      message: error.message,
     });
   }
 });
 
-// GET API
+// GET API - Get All Reservations
 app.get("/api/reservation", async (req, res) => {
-  await connectDB();
-
   try {
-    const data = await Reservation.find();
-    res.status(200).json(data);
+    await connectDB();
+
+    const reservations = await Reservation.find();
+    res.status(200).json(reservations);
   } catch (error) {
+    console.error("Reservation GET Error:", error.message);
     res.status(500).json({
       success: false,
-      message: "Error fetching data",
+      message: error.message,
     });
   }
 });
