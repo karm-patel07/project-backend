@@ -1,12 +1,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const path = require("path");
-require("dotenv").config({
-  path: path.join(__dirname, "config", "config.env"),
-});
 
 const app = express();
+
+// Middleware
 app.use(express.json());
 app.use(
   cors({
@@ -14,46 +12,78 @@ app.use(
     credentials: true,
   }),
 );
-//Reservation;
-// MongoDB Connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.log(err));
 
-// Schema + Model
+// MongoDB Connection (Only connect once)
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected) return;
+
+  try {
+    const db = await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    isConnected = db.connections[0].readyState;
+    console.log("MongoDB Connected");
+  } catch (error) {
+    console.error("MongoDB Connection Error:", error);
+  }
+};
+
+// Schema
 const reservationSchema = new mongoose.Schema(
   {
-    firstName: String,
-    lastName: String,
-    email: String,
-    phone: Number,
-    date: String,
-    time: String,
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: { type: Number, required: true },
+    date: { type: String, required: true },
+    time: { type: String, required: true },
   },
   { collection: "rest" },
 );
 
-const Reservation = mongoose.model("", reservationSchema);
+// Model
+const Reservation =
+  mongoose.models.Reservation ||
+  mongoose.model("Reservation", reservationSchema);
 
 // POST API
 app.post("/api/reservation", async (req, res) => {
+  await connectDB();
+
   try {
     const newReservation = new Reservation(req.body);
     await newReservation.save();
-    res.json({ success: true, message: "Reservation saved successfully!" });
+
+    res.status(201).json({
+      success: true,
+      message: "Reservation saved successfully!",
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error saving data" });
+    res.status(500).json({
+      success: false,
+      message: "Error saving data",
+    });
   }
 });
 
 // GET API
 app.get("/api/reservation", async (req, res) => {
-  const data = await Reservation.find();
-  res.json(data);
+  await connectDB();
+
+  try {
+    const data = await Reservation.find();
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching data",
+    });
+  }
 });
 
-// Server
-app.listen(process.env.PORT, () =>
-  console.log(`Server running on port ${process.env.PORT || 5000}`),
-);
+// Export for Vercel
+module.exports = app;
